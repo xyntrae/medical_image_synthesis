@@ -30,7 +30,7 @@ This project focuses on generating synthetic medical images using Generative Adv
 
 1. **Clone the repository:**
    ```bash
-   git clone https://github.com/HeyMyNameIsV/medical_image_synthesis.git
+   git clone https://github.com/xyntrae/medical_image_synthesis.git
    cd medical_image_synthesis
 
 2. **Install the required dependencies:**

@@ -1,8 +1,9 @@
 import tensorflow as tf
 from tensorflow import keras
 from keras import layers
+from config import NOISE_DIM
 
-def build_generator(noise_dim=100):
+def build_generator(noise_dim=NOISE_DIM):
     model = tf.keras.Sequential([
         layers.Dense(256 * 8 * 8, activation='relu', input_shape=(noise_dim,)),
         layers.Reshape((8, 8, 256)),

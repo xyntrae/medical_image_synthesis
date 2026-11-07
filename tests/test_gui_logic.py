@@ -28,8 +28,10 @@ def test_label_text_says_synthetic():
     assert "SYNTHETIC" in gui_app.SYNTHETIC_LABEL and "Not a real scan" in gui_app.SYNTHETIC_LABEL
 
 
-@pytest.fixture
-def tk_root():
+@pytest.fixture(scope="module")
+def _tk_session():
+    # One Tk interpreter per module: creating several Tk() roots in one process can fail
+    # intermittently on Windows during Tcl initialisation.
     tk = pytest.importorskip("tkinter")
     try:
         root = tk.Tk()
@@ -38,6 +40,15 @@ def tk_root():
     root.withdraw()
     yield root
     root.destroy()
+
+
+@pytest.fixture
+def tk_root(_tk_session):
+    import tkinter as tk
+    top = tk.Toplevel(_tk_session)
+    top.withdraw()
+    yield top
+    top.destroy()
 
 
 def test_missing_weights_shows_message_and_disables_button(tk_root, tmp_path, monkeypatch):

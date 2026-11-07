@@ -202,6 +202,8 @@ def _child_main(args) -> int:
 
     if args.child_stage == "preprocess":
         import runpy
+        # Run the script with no CLI arguments so it uses its defaults, not this wrapper's argv.
+        sys.argv = [str(REPO / "data_preprocessing.py")]
         runpy.run_path(str(REPO / "data_preprocessing.py"), run_name="__main__")
     elif args.child_stage == "train":
         if args.smoke_epochs:
@@ -217,6 +219,8 @@ def _child_main(args) -> int:
 
             tf.keras.Model.fit = fit
         import runpy
+        # Run the script with no CLI arguments so it uses its defaults, not this wrapper's argv.
+        sys.argv = [str(REPO / "model_training.py")]
         runpy.run_path(str(REPO / "model_training.py"), run_name="__main__")
     elif args.child_stage == "export":
         _export_samples(args, tf, np)

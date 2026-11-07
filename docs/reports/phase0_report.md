@@ -515,3 +515,115 @@ exist for this phase.
    score, augmentation) be considered in a later phase, or ignored?
 5. After you run the audit on your real data, please share the default
    report (sections 1 to 7 only, generated without `--show-filenames`).
+
+## Addendum: TensorFlow checks
+
+Date: 2026-11-07. Run after you authorised TensorFlow on synthetic fixtures,
+CPU only. **Every result in this addendum is a smoke test on synthetic
+fixture data. None of it says anything about model quality on real data.**
+
+Environment: venv `C:\Users\iamab\.venvs\mis_baseline_py311`, Python 3.11.7,
+tensorflow 2.13.0 (tensorflow-intel 2.13.0), keras 2.13.1, numpy 1.24.3,
+Pillow 9.4.0, Windows 11, runner option `--cpu` (`CUDA_VISIBLE_DEVICES=-1`).
+Seed 42 for the runner, fixture seed 1234.
+
+### A1. GPU visibility
+
+```
+$ python -c "import tensorflow as tf; print(tf.__version__, tf.config.list_physical_devices('GPU'))"
+2.13.0 []
+$ python -c "import tensorflow as tf; print('built_with_cuda', tf.test.is_built_with_cuda())"
+built_with_cuda False
+```
+
+TensorFlow 2.13 on native Windows does **not** see the GPU; the Windows
+build is not built with CUDA. The TensorFlow baseline stays on CPU (your
+decision; GPU work moves to PyTorch in Phase 4).
+
+### A2. Fixture
+
+```
+$ python tools/make_synthetic_fixture.py --overwrite
+Synthetic fixture written to fixtures\synthetic_raw: brain_tumor=159 files, non_brain_tumor=153 files
+```
+
+### A3. Two identical smoke runs
+
+```
+$ python tools/run_baseline.py --data-dir fixtures/synthetic_raw --output-dir outputs/smoke_run1 --smoke-epochs 2 --seed 42 --cpu
+$ python tools/run_baseline.py --data-dir fixtures/synthetic_raw --output-dir outputs/smoke_run2 --smoke-epochs 2 --seed 42 --cpu --quiet
+```
+
+Both finished with return code 0. No runner fix was needed. Trimmed
+output of run 1 (TF CPU-feature info lines and progress-bar updates
+omitted):
+
+```
+Error loading image data/brain_tumor\corrupt_0000.png: cannot identify image file <_io.BytesIO object at 0x...>
+Error loading image data/non_brain_tumor\stray_notes.txt: cannot identify image file <_io.BytesIO object at 0x...>
+[run_baseline] SMOKE TEST: overriding epochs 50 -> 2
+Epoch 1/2
+3/3 [==============================] - 5s 736ms/step - gen_loss: 0.7448 - disc_loss: 1.3567
+Epoch 2/2
+3/3 [==============================] - 3s 752ms/step - gen_loss: 0.8537 - disc_loss: 1.2861
+[run_baseline] exported 64 samples and 8x8 grid to ...\outputs\smoke_run1\samples
+[run_baseline] smoke_test finished with return code 0; total wall time 23.831 s; 2 epochs parsed
+```
+
+The two error lines are the planted unreadable file and the planted text
+file; the unchanged preprocessing script skips them, as expected.
+Child environment reported by every stage: `tf_gpus: []`,
+`op_determinism: true`, `PYTHONHASHSEED=42`, `TF_DETERMINISTIC_OPS=1`,
+`TF_CUDNN_DETERMINISTIC=1`, `TF_ENABLE_ONEDNN_OPTS=0`,
+`CUDA_VISIBLE_DEVICES=-1`.
+
+| (synthetic smoke test, CPU) | run 1 | run 2 |
+|---|---|---|
+| total wall time (s) | 23.831 | 19.606 |
+| preprocess / train / export (s) | 6.9 / 12.007 / 4.759 | 4.147 / 10.756 / 4.561 |
+| array shapes | brain_tumor (158, 128, 128, 1), non_brain_tumor (152, 128, 128, 1) | same |
+| GPU memory before / peak (MiB, whole device) | 1321 / 1321 | 1321 / 1321 |
+
+The GPU memory figures only show desktop usage; training ran on CPU.
+
+### A4. Loss comparison (programmatic)
+
+Compared with a Python script (csv module, float difference per value):
+
+```
+epoch 1 gen_loss: 0.7448 vs 0.7448 diff=0.0
+epoch 1 disc_loss: 1.3567 vs 1.3567 diff=0.0
+epoch 2 gen_loss: 0.8537 vs 0.8537 diff=0.0
+epoch 2 disc_loss: 1.2861 vs 1.2861 diff=0.0
+losses identical (string): True
+losses.csv sha256 equal: False
+weights sha256 equal: True
+sample pixels identical across runs: True
+```
+
+- Loss values are identical in both runs. The CSV files differ only in the
+  `epoch_time` column (run 1: 5s, 3s; run 2: 4s, 2s), which is wall-clock
+  time printed by Keras.
+- Keras prints losses with 4 decimals, so the CSV alone cannot show
+  differences below 1e-4. Stronger evidence: the saved generator weights
+  files are byte-identical (SHA-256), the preprocessed arrays are equal
+  (`np.array_equal`), and all 65 exported PNGs are pixel-identical between
+  the runs.
+- Conclusion for this setting only (CPU, seed 42, 2 epochs, this fixture):
+  the runs were bitwise reproducible. This was not tested on GPU or for
+  50 epochs.
+
+### A5. Sample export and summary
+
+- `samples/` in each run: 64 `synthetic_sample_XXXX.png` plus
+  `SYNTHETIC_grid_8x8.png`.
+- All 64 individual PNGs: format PNG, size 128x128, mode L (grayscale),
+  PNG text `Synthetic=true`; file names start with `synthetic_`.
+- Grid: 1042x1070, mode L, PNG text `Synthetic=true`, `RunType=smoke_test`,
+  visible SYNTHETIC banner.
+- `run_summary.json`: `run_type` smoke_test, `smoke_epochs` 2,
+  `epochs_parsed` 2, `returncode` 0, `git_baseline_files_modified` empty.
+  `SYNTHETIC_OUTPUTS_README.txt` present.
+- Reduced-epoch option works: the log shows `overriding epochs 50 -> 2`,
+  Keras prints `Epoch 1/2` and `Epoch 2/2`, and `losses.csv` has
+  `total_epochs` 2.

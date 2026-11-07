@@ -6,6 +6,16 @@ editing any of its files, and adds seeding, logging and sample export around
 it. All images it exports are synthetic research artifacts, not real scans,
 with no clinical validity.
 
+Note (Phase 1): the runner executes the scripts in the current checkout with
+their default arguments. Phase 1 changed `data_preprocessing.py`,
+`model_training.py` and `models/generator.py` with defaults that keep the
+original behavior, and the trainer now also saves
+`discriminator_w.weights.h5`. On the synthetic fixture (CPU, seed 42,
+2 smoke epochs) the Phase 1 code produced the same losses, a byte-identical
+generator weights file and pixel-identical samples as the `baseline-v0` code
+(see `docs/reports/phase1_report.md`). The original files remain available at
+tag `baseline-v0`.
+
 ## What the baseline does (unchanged)
 
 - Loads every file in `data/brain_tumor/` and `data/non_brain_tumor/` as

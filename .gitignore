@@ -1,0 +1,13 @@
+# Data, fixtures and run artifacts (never commit)
+data/
+fixtures/
+outputs/
+cache/
+*.npy
+*.h5
+*.pt
+*.ckpt
+
+# Python
+__pycache__/
+.venv/
